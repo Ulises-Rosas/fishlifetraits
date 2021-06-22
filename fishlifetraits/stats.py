@@ -5,11 +5,16 @@ import sys
 import csv
 import glob
 import copy
-import dendropy
 import itertools
 import collections
 import statistics as stats
 from multiprocessing import Pool
+
+
+import dendropy
+import numpy as np
+from scipy.stats import chi2
+
 
 from fishlifetraits.utils import fas_to_dic
 
@@ -171,6 +176,145 @@ class Features:
         return ( round( stats.mean(pi_list) , 6 ),
                  round( stats.stdev(pi_list), 6 ),
                  list(zip(headers_list, pi_list)) )
+
+    def _Stuart_symmetry(self, dissM):
+        """
+        Stuart (1955)
+        for marginal symmetry
+        """
+        # dissM = np.array([[1,0,0,0],
+        #                   [0,2,0,0],
+        #                   [0,0,3,0],
+        #                   [0,0,0,4]])
+
+        ut = np.zeros((3,))
+        for i in range(3):
+            ut[i] = np.sum(dissM[i,:]) - np.sum(dissM[:,i])
+
+        u = ut.reshape((-1, 1))
+
+        # variance-covariance matrix of marg res
+        V = np.zeros((3,3))
+        for i in range(3):
+            for j in range(3):
+                if i == j:
+                    V[i,j] = np.sum(dissM[i,:]) + np.sum(dissM[:,i]) - 2 * dissM[i,i]
+
+                else:
+                    V[i,j] = -(dissM[i,j] + dissM[j,i])
+
+        # test matrix singularity
+        if np.linalg.cond(V) < 1/np.finfo(V.dtype).eps:
+
+            Vi = np.linalg.inv(V)
+
+            Ss   = (ut.dot(Vi)).dot(u).item()
+            pval = 1 - chi2.cdf( Ss, 3 ) # 3 -> m - 1 
+            return (Ss, round(pval, 6) )
+
+        else:
+            return None
+
+    def _Internal_symmetry(self, Sb, Ss, Dfb):
+
+        if Sb and Ss and Dfb > 3:
+            Si =  Sb - Ss
+            pval = 1 - chi2.cdf( Si, Dfb - 3 ) # f - m + 1
+            return round( pval, 6 )
+
+        else:
+            return None
+
+    def dissMat(self, str1, str2):
+        """
+        {A, T, C, G} dissimilarity matrix
+        """
+        bases = np.array(['A', 'T', 'C', 'G']).reshape((1, -1))
+
+        x = np.array(list(str1)).reshape((-1, 1))
+        y = np.array(list(str2)).reshape((-1, 1))
+
+        bases_x = (x == bases).astype(int)
+        bases_y = (y == bases).astype(int)
+
+        return np.dot(bases_y.T, bases_x)
+
+    def _Bowker_symmetry(self, all_pairs, aln):
+        """
+        * Bowker (1948) 
+        """
+        # max divergence pair
+        all_diss = []
+
+        for tpair in all_pairs:
+
+            str1 = aln[ ">" + tpair[0]]
+            str2 = aln[ ">" + tpair[1]]
+            mym  = self.dissMat(str1, str2)
+            tmp_diss = (np.sum(mym) - np.sum(np.diagonal(mym)))/np.sum(mym)
+
+            all_diss.append((tpair, tmp_diss))
+
+        pair,_ = sorted(all_diss, key = lambda l: l[1], reverse=True)[0]
+
+        str1 = aln[ ">" + pair[0]]
+        str2 = aln[ ">" + pair[1]]
+
+        dissM = self.dissMat(str1, str2)
+
+        D = dissM + dissM.T
+        N = np.power(dissM - dissM.T, 2) # diag allways zero
+
+        lt = np.tril(
+            np.true_divide( N, D, where = (N!=0) | (D!=0) )
+        )
+
+        Sb = np.sum(lt)
+        # degrees of freedom
+        dfb = np.count_nonzero(lt)
+
+        return dissM, Sb, dfb
+
+    def _symmetries(self, all_pairs, aln):
+        """
+        Assessing Symmetry, Homogeneity and Reversevility 
+        assumptions
+
+        Symmetry tests based on:
+
+        * Bowker (1948) 
+        * Stuart (1955) 
+        * Ababneh et al. (2006) 
+        @ https://doi.org/10.1093/bioinformatics/btl064\\
+        
+        Code based on:
+
+        * Naser-Khdour et al. (2019)
+        @ https://doi.org/10.1093/gbe/evz193
+        """
+        # all_pairs = [i[0] for i in pi_table]
+
+        dissM, Sb, dfb = self._Bowker_symmetry(all_pairs, aln)
+
+        if not dfb:
+            return (None, None, None)
+
+        SBpvalue = round( 1 - chi2.cdf( Sb, dfb ), 6 )
+
+        Ss_SSpvalue = self._Stuart_symmetry(dissM)
+
+        if not Ss_SSpvalue:
+            return (SBpvalue, None, None)
+
+        Ss,SSpvalue = Ss_SSpvalue
+
+        SIpvalue = self._Internal_symmetry(Sb, Ss, dfb)
+
+        if not SIpvalue:
+            return (SBpvalue, SSpvalue, None)
+
+        return (SBpvalue, SSpvalue, SIpvalue)
+
 
     def _RCV(self, clean_rows, nheaders, seq_len):
         """
@@ -535,7 +679,11 @@ class Features:
 
     def stat_iterator(self, aln_tree_files):
 
-        aln_file,tree_file = aln_tree_files      
+        aln_file,tree_file = aln_tree_files
+        # aln_file,tree_file = seq_tree_files[0]
+        # aln_file = "/Users/ulises/Desktop/GOL/data/alldatasets/nt_aln\
+        # /internally_trimmed/malns_36_mseqs_27/\
+        # round2/no_lavaretus/McL/E0795.r2_para_no_lavaretus_TBL_tlike_aln"
         aln_base = os.path.basename(aln_file)
         tree_base = os.path.basename(tree_file)
 
@@ -543,8 +691,6 @@ class Features:
         sys.stdout.write("Processing stats for: %s\n" % tree_base)
         sys.stdout.flush()
 
-        # aln_file = "/Users/ulises/Desktop/GOL/software/GGpy/demo/ND4.r2_para_no_lavaretus_TBL_tlike_aln"
-        # tree_file = "/Users/ulises/Desktop/GOL/software/GGpy/demo/ND4.r2_para_no_lavaretus_TBL_tlike_aln.nex.treefile"
         aln  = fas_to_dic(aln_file)
         
         (pis          ,
@@ -577,6 +723,12 @@ class Features:
         treeness_o_rcv = round(rcv/treeness, 6)
         saturation     = round(self._saturation(pi_table, patristic), 6)
 
+        all_pairs = [i[0] for i in pi_table]
+
+        (SymPval,
+         MarPval,
+         IntPval) = self._symmetries(all_pairs, aln)
+
         stdout = [ 
             aln_base      , 
             nheaders      , pis           , var_s         ,
@@ -586,7 +738,8 @@ class Features:
             pi_std        , total_tree_len, treeness      ,
             inter_len_mean, inter_len_var , ter_len_mean  ,
             ter_len_var   , rcv           , treeness_o_rcv,
-            saturation
+            saturation    , SymPval       , MarPval,
+            IntPval
         ]
 
         if self._taxa:
@@ -633,7 +786,8 @@ class Features:
             "pi_std"        , "total_tree_len", "treeness"      ,
             "inter_len_mean", "inter_len_var" , "ter_len_mean"  ,
             "ter_len_var"   , "rcv"           , "treeness_o_rcv",
-            "saturation" 
+            "saturation"    , "SymPval"       , "MarPval"       ,
+            "IntPval"
         ]
 
         if self._taxa:
@@ -713,5 +867,7 @@ class Features:
 #     codon_aware=True,
 #     threads= 5,
 #     suffix="p_zero75.tsv", # change
-#     write=True
+#     # write=True
 #     )
+
+# self.write_stats()
