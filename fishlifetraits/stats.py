@@ -277,7 +277,7 @@ class Features:
 
     def _symmetries(self, all_pairs, aln):
         """
-        Assessing Symmetry, Homogeneity and Reversevility 
+        Assessing Stationarity, Homogeneity and Reversevility 
         assumptions
 
         Symmetry tests based on:
@@ -285,7 +285,7 @@ class Features:
         * Bowker (1948) 
         * Stuart (1955) 
         * Ababneh et al. (2006) 
-        @ https://doi.org/10.1093/bioinformatics/btl064\\
+        @ https://doi.org/10.1093/bioinformatics/btl064
         
         Code based on:
 
@@ -315,6 +315,25 @@ class Features:
 
         return (SBpvalue, SSpvalue, SIpvalue)
 
+    def _LB_score(self, patristic):
+        """
+        * Equation based on Struck (2014) @ https://doi.org/10.4137/EBO.S14239
+        """
+        all_pairs = itertools.combinations(patristic.keys(), 2)
+        all_branches = []
+        for h1,h2 in all_pairs:
+            all_branches.append(  patristic[h1][h2] )
+
+        cross_tax_mean = stats.mean(all_branches)
+
+        all_LB_scores = []
+
+        for k,v in patristic.items():
+            tax_mean = stats.mean( [v2 for k2,v2 in v.items() if k2 != k] )
+            tmp_lb_score = ( (tax_mean/cross_tax_mean) - 1 ) * 100
+            all_LB_scores.append( tmp_lb_score )
+
+        return round( stats.stdev(all_LB_scores), 6 )
 
     def _RCV(self, clean_rows, nheaders, seq_len):
         """
@@ -505,6 +524,7 @@ class Features:
 
         int_branches = []
         ter_branches = []
+        node_labels  = []
         tree = dendropy.Tree.get(
                     path   = tree_file, 
                     schema = 'newick',
@@ -512,15 +532,22 @@ class Features:
                 )
 
         for ed in tree.postorder_edge_iter():
-
             if ed.is_internal():
                 int_branches.append(ed.length)
+                node_labels.append(ed._head_node._label)
 
             else:
                 ter_branches.append(ed.length)
         
         int_branches_fil = list( filter(None, int_branches) )
         ter_branches_fil = list( filter(None, ter_branches) )
+        node_labels_fil  = list( filter(None, node_labels)  )
+
+        if node_labels_fil:
+            avg_node = stats.mean([float(i) for i in node_labels_fil])
+
+        else:
+            avg_node = 0
 
         total_treelen = sum( int_branches_fil + ter_branches_fil )
         treeness      = sum(int_branches_fil)/total_treelen
@@ -532,6 +559,7 @@ class Features:
                  round( stats.variance(int_branches_fil), 6 ) ,
                  round( stats.mean(ter_branches_fil)    , 6 ) ,
                  round( stats.variance(ter_branches_fil), 6 ) ,
+                 round( avg_node                        , 6 ) ,
                  patristic_d )
 
     def _coeff_deter(self, values):
@@ -717,6 +745,7 @@ class Features:
          inter_len_var ,
          ter_len_mean  ,
          ter_len_var   ,
+         avg_node      ,
          patristic     ) = self._branch_len_stats(tree_file)
  
         rcv            = round(self._RCV(clean_rows, nheaders, seq_len), 6)
@@ -729,6 +758,8 @@ class Features:
          MarPval,
          IntPval) = self._symmetries(all_pairs, aln)
 
+        LB_std = self._LB_score(patristic)
+
         stdout = [ 
             aln_base      , 
             nheaders      , pis           , var_s         ,
@@ -737,9 +768,9 @@ class Features:
             gap_mean      , gap_var       , pi_mean       ,
             pi_std        , total_tree_len, treeness      ,
             inter_len_mean, inter_len_var , ter_len_mean  ,
-            ter_len_var   , rcv           , treeness_o_rcv,
-            saturation    , SymPval       , MarPval,
-            IntPval
+            ter_len_var   , avg_node      , rcv           , 
+            treeness_o_rcv, saturation    , SymPval       , 
+            MarPval       , IntPval       , LB_std
         ]
 
         if self._taxa:
@@ -785,9 +816,9 @@ class Features:
             "gap_mean"      , "gap_var"       , "pi_mean"       ,
             "pi_std"        , "total_tree_len", "treeness"      ,
             "inter_len_mean", "inter_len_var" , "ter_len_mean"  ,
-            "ter_len_var"   , "rcv"           , "treeness_o_rcv",
-            "saturation"    , "SymPval"       , "MarPval"       ,
-            "IntPval"
+            "ter_len_var"   , "supp_mean"     , "rcv"           ,
+            "treeness_o_rcv", "saturation"    , "SymPval"       , 
+            "MarPval"       , "IntPval"       , "LB_std"
         ]
 
         if self._taxa:
