@@ -10,7 +10,7 @@ with open('README.md') as readme_file:
     readme = readme_file.read()
 
 setup(name = "fishlifetraits",
-      version = '0.4.1',
+      version = '0.4.2',
       maintainer = 'Ulises Rosas',
       maintainer_email = 'ulisesfrosasp@gmail.com',
       long_description = readme,

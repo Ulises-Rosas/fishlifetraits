@@ -261,7 +261,10 @@ class Features:
             str1 = aln[ ">" + tpair[0]]
             str2 = aln[ ">" + tpair[1]]
             mym  = self.dissMat(str1, str2, aa = aa)
-            tmp_diss = (np.sum(mym) - np.sum(np.diagonal(mym)))/np.sum(mym)
+            tmp_sum = np.sum(mym)
+            if not tmp_sum:
+                continue
+            tmp_diss = (tmp_sum - np.sum(np.diagonal(mym)))/tmp_sum
 
             all_diss.append((tpair, tmp_diss))
 
@@ -302,6 +305,7 @@ class Features:
         * Naser-Khdour et al. (2019)
         @ https://doi.org/10.1093/gbe/evz193
         """
+        # aa = True
         # all_pairs = [i[0] for i in pi_table]
 
         dissM, Sb, dfb = self._Bowker_symmetry(all_pairs, aln, aa = aa)
@@ -719,9 +723,7 @@ class Features:
 
         aln_file,tree_file = aln_tree_files
         # aln_file,tree_file = seq_tree_files[0]
-        # aln_file = "/Users/ulises/Desktop/GOL/data/alldatasets/nt_aln\
-        # /internally_trimmed/malns_36_mseqs_27/\
-        # round2/no_lavaretus/McL/E0795.r2_para_no_lavaretus_TBL_tlike_aln"
+        # aln_file = "/Users/ulises/Desktop/GOL/data/alldatasets/nt_aln/internally_trimmed/malns_36_mseqs_27/round2/no_lavaretus/protein/round1/E0807.aaseqs.fasta"
         aln_base = os.path.basename(aln_file)
         tree_base = os.path.basename(tree_file)
 
