@@ -225,11 +225,21 @@ class Features:
         else:
             return None
 
-    def dissMat(self, str1, str2):
+    def dissMat(self, str1, str2, aa = False):
         """
         {A, T, C, G} dissimilarity matrix
         """
-        bases = np.array(['A', 'T', 'C', 'G']).reshape((1, -1))
+        if aa:
+            bases = np.array([
+                'A', 'C', 'D', 'E', 
+                'F', 'G', 'H', 'I', 
+                'K', 'L', 'M', 'N', 
+                'P', 'Q', 'R', 'S', 
+                'T', 'V', 'W', 'Y'
+                ]).reshape((1, -1))
+            
+        else:
+            bases = np.array(['A', 'T', 'C', 'G']).reshape((1, -1))
 
         x = np.array(list(str1)).reshape((-1, 1))
         y = np.array(list(str2)).reshape((-1, 1))
@@ -239,7 +249,7 @@ class Features:
 
         return np.dot(bases_y.T, bases_x)
 
-    def _Bowker_symmetry(self, all_pairs, aln):
+    def _Bowker_symmetry(self, all_pairs, aln, aa = False):
         """
         * Bowker (1948) 
         """
@@ -250,7 +260,7 @@ class Features:
 
             str1 = aln[ ">" + tpair[0]]
             str2 = aln[ ">" + tpair[1]]
-            mym  = self.dissMat(str1, str2)
+            mym  = self.dissMat(str1, str2, aa = aa)
             tmp_diss = (np.sum(mym) - np.sum(np.diagonal(mym)))/np.sum(mym)
 
             all_diss.append((tpair, tmp_diss))
@@ -260,7 +270,7 @@ class Features:
         str1 = aln[ ">" + pair[0]]
         str2 = aln[ ">" + pair[1]]
 
-        dissM = self.dissMat(str1, str2)
+        dissM = self.dissMat(str1, str2, aa = aa)
 
         D = dissM + dissM.T
         N = np.power(dissM - dissM.T, 2) # diag allways zero
@@ -275,7 +285,7 @@ class Features:
 
         return dissM, Sb, dfb
 
-    def _symmetries(self, all_pairs, aln):
+    def _symmetries(self, all_pairs, aln, aa = False):
         """
         Assessing Stationarity, Homogeneity and Reversevility 
         assumptions
@@ -294,7 +304,7 @@ class Features:
         """
         # all_pairs = [i[0] for i in pi_table]
 
-        dissM, Sb, dfb = self._Bowker_symmetry(all_pairs, aln)
+        dissM, Sb, dfb = self._Bowker_symmetry(all_pairs, aln, aa = aa)
 
         if not dfb:
             return (None, None, None)

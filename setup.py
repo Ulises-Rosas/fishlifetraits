@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-# import setuptools
+import setuptools
 from distutils.core import setup
 
 dependencies = ['dendropy==4.4.0', 'scipy', 'numpy']
@@ -10,7 +10,7 @@ with open('README.md') as readme_file:
     readme = readme_file.read()
 
 setup(name = "fishlifetraits",
-      version = '0.4.0',
+      version = '0.4.1',
       maintainer = 'Ulises Rosas',
       maintainer_email = 'ulisesfrosasp@gmail.com',
       long_description = readme,
