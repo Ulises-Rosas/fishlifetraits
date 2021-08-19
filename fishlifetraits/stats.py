@@ -522,6 +522,32 @@ class Features:
                  nheaders, 
                  AlnLen_nogaps)
 
+    def _DVMC(self, tree):
+        """
+        Degree of violation of molecular clock (DVMC)
+        estimated from a mid-point rooted tree.
+        DVMC according to Liu et al. 2017. 
+        DOI: https://doi.org/10.1073/pnas.1616744114
+        """
+        tip_root_dists = []
+        for nd in tree.preorder_node_iter():
+            if nd.is_leaf():
+                tip_root_dists.append( nd.distance_from_root() )
+
+        return stats.stdev(tip_root_dists)
+
+    def _coeffVar_rtl(self, tree):
+        """ 
+        Rate variation among lineages:
+        Coefficient of variation of branch lengths
+        after mid-point rooting according 
+        Vankan et al. 2021
+        DOI: https://doi.org/10.1093/sysbio/syab051
+        """
+        all_lengths  = [ ed.length for ed in tree.postorder_edge_iter() ]
+        rootTip_lengths = list( filter(None, all_lengths) )
+        return stats.stdev(rootTip_lengths)/stats.mean(rootTip_lengths)
+
     def _branch_len_stats(self, tree_file):
         """
         All about lengths
@@ -567,6 +593,12 @@ class Features:
         treeness      = sum(int_branches_fil)/total_treelen
         patristic_d   = tree.phylogenetic_distance_matrix().as_data_table()._data
 
+        # mid-point rooting
+        tree.reroot_at_midpoint(update_bipartitions = True)
+
+        coeffVar_rtl = self._coeffVar_rtl(tree)
+        # clockness = self._DVMC(tree)
+
         return ( round( total_treelen                   , 6 ) ,
                  round( treeness                        , 6 ) ,
                  round( stats.mean(int_branches_fil)    , 6 ) ,
@@ -574,6 +606,7 @@ class Features:
                  round( stats.mean(ter_branches_fil)    , 6 ) ,
                  round( stats.variance(ter_branches_fil), 6 ) ,
                  round( avg_node                        , 6 ) ,
+                 round( coeffVar_rtl                    , 6 ) ,
                  patristic_d )
 
     def _coeff_deter(self, values):
@@ -758,6 +791,7 @@ class Features:
          ter_len_mean  ,
          ter_len_var   ,
          avg_node      ,
+         coeffVar_len  ,
          patristic     ) = self._branch_len_stats(tree_file)
  
         rcv            = round(self._RCV(clean_rows, nheaders, seq_len), 6)
@@ -780,9 +814,10 @@ class Features:
             gap_mean      , gap_var       , pi_mean       ,
             pi_std        , total_tree_len, treeness      ,
             inter_len_mean, inter_len_var , ter_len_mean  ,
-            ter_len_var   , avg_node      , rcv           , 
-            treeness_o_rcv, saturation    , SymPval       , 
-            MarPval       , IntPval       , LB_std
+            ter_len_var   , avg_node      , coeffVar_len  ,
+            rcv           , treeness_o_rcv, saturation    , 
+            SymPval       , MarPval       , IntPval       , 
+            LB_std
         ]
 
         if self._taxa:
@@ -828,9 +863,10 @@ class Features:
             "gap_mean"      , "gap_var"       , "pi_mean"       ,
             "pi_std"        , "total_tree_len", "treeness"      ,
             "inter_len_mean", "inter_len_var" , "ter_len_mean"  ,
-            "ter_len_var"   , "supp_mean"     , "rcv"           ,
-            "treeness_o_rcv", "saturation"    , "SymPval"       , 
-            "MarPval"       , "IntPval"       , "LB_std"
+            "ter_len_var"   , "supp_mean"     , "coeffVar_len"  ,
+            "rcv"           , "treeness_o_rcv", "saturation"    , 
+            "SymPval"       , "MarPval"       , "IntPval"       ,
+            "LB_std"
         ]
 
         if self._taxa:
