@@ -4,9 +4,9 @@
 |:--------------|:----------------------------------------------------------|:---------------------------------------------------------|
 |aln_base       |alignment name                                             |                                                          |
 |nheaders       |number of sequences at the alignment                       |                                                          |
-|pis            |parsimony-informative sites                                |                                                          |
+|seq_len        |alignment length devided by seq_len                        |                                                          |
+|pis            |parsimony-informative sites devided by seq_len             |                                                          |
 |vars           |variable sites                                             |                                                          |
-|seq_len        |alignment length                                           |                                                          |
 |seq_len_nogap  |number of sites without gaps                               |                                                          |
 |gap_prop       |proportion of gaps characters for the alignment matrix     |Considered gap characters: 'N', '-', '!', '?'             |
 |nogap_prop     |proportion of non-gap characters for the alignment matrix  |                                                          |
