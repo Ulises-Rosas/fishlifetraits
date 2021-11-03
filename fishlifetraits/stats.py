@@ -31,7 +31,16 @@ class Features:
                 suffix = 'stats.tsv',
                 threads = 1):
         
-        self.gap_chars = ['N', '-', '!', '?']                
+        self.gap_chars = ['N', '-', '!', '?']
+        self.aa_bases = [
+                'A', 'C', 'D', 'E', 
+                'F', 'G', 'H', 'I', 
+                'K', 'L', 'M', 'N', 
+                'P', 'Q', 'R', 'S', 
+                'T', 'V', 'W', 'Y'
+                ]      
+        self.nt_bases = ['A', 'T', 'C', 'G']
+
         self.fast_ext = fasta_ext
         self.tree_ext  = tree_ext
         self.path = path
@@ -230,16 +239,10 @@ class Features:
         {A, T, C, G} dissimilarity matrix
         """
         if aa:
-            bases = np.array([
-                'A', 'C', 'D', 'E', 
-                'F', 'G', 'H', 'I', 
-                'K', 'L', 'M', 'N', 
-                'P', 'Q', 'R', 'S', 
-                'T', 'V', 'W', 'Y'
-                ]).reshape((1, -1))
+            bases = np.array(self.aa_bases).reshape((1, -1))
             
         else:
-            bases = np.array(['A', 'T', 'C', 'G']).reshape((1, -1))
+            bases = np.array(self.nt_bases).reshape((1, -1))
 
         x = np.array(list(str1)).reshape((-1, 1))
         y = np.array(list(str2)).reshape((-1, 1))
@@ -514,8 +517,8 @@ class Features:
         AREA = nheaders * seq_len
         gap_prop = round(n_gaps/AREA, 6)
 
-        return ( pis_s, 
-                 var_s, 
+        return ( round( pis_s/seq_len, 6),
+                 round( var_s/seq_len, 6),
                  gap_prop, 
                  1 - gap_prop, 
                  seq_len, 
@@ -756,7 +759,7 @@ class Features:
 
         aln_file,tree_file = aln_tree_files
         # aln_file,tree_file = seq_tree_files[0]
-        # aln_file = "/Users/ulises/Desktop/GOL/data/alldatasets/nt_aln/internally_trimmed/malns_36_mseqs_27/round2/no_lavaretus/protein/round1/E0807.aaseqs.fasta"
+        # aln_file = "/Users/ulises/Desktop/GOL/software/GGpy/demo/24_ENSG00000000460_codon_aln.fasta"
         aln_base = os.path.basename(aln_file)
         tree_base = os.path.basename(tree_file)
 
@@ -766,8 +769,8 @@ class Features:
 
         aln  = fas_to_dic(aln_file)
         
-        (pis          ,
-         var_s        ,
+        (pis_prop     ,
+         var_s_prop   ,
          gap_prop     ,
          nogap_prop   ,
          seq_len      ,
@@ -808,7 +811,7 @@ class Features:
 
         stdout = [ 
             aln_base      , 
-            nheaders      , pis           , var_s         ,
+            nheaders      , pis_prop      , var_s_prop    ,
             seq_len       , seq_len_nogap , gap_prop      , 
             nogap_prop    , gc_mean       , gc_var        ,
             gap_mean      , gap_var       , pi_mean       ,
@@ -857,7 +860,7 @@ class Features:
 
         colnames = [
             "aln_base"      ,
-            "nheaders"      , "pis"           , "vars"          , 
+            "nheaders"      , "pis_prop"      , "var_s_prop"    , 
             "seq_len"       , "seq_len_nogap" , "gap_prop"      , 
             "nogap_prop"    , "gc_mean"       , "gc_var"        ,
             "gap_mean"      , "gap_var"       , "pi_mean"       ,
