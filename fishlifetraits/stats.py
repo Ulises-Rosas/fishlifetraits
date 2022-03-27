@@ -28,6 +28,7 @@ class Features:
                 path = ".",
                 taxonomyfile = None,
                 codon_aware = True,
+                sym_tests = True,
                 suffix = 'stats.tsv',
                 threads = 1):
         
@@ -58,6 +59,8 @@ class Features:
                                 )
         else:
             self._spps_tree = None
+
+        self.sym_tests = sym_tests
 
         self.groups_file = groups_file
         self.threads = threads
@@ -311,6 +314,9 @@ class Features:
         # aa = True
         # all_pairs = [i[0] for i in pi_table]
 
+        if not self.sym_tests:
+            return (None, None, None)
+
         dissM, Sb, dfb = self._Bowker_symmetry(all_pairs, aln, aa = aa)
 
         if not dfb:
@@ -381,6 +387,7 @@ class Features:
             row_rv.append(row_sum)
 
         return sum(row_rv)/(nheaders * seq_len)
+        # return sum(row_rv)/seq_len
 
     def _stat_sites_horizontal(self, aln):
 
@@ -860,7 +867,7 @@ class Features:
 
         colnames = [
             "aln_base"      ,
-            "nheaders"      , "pis_prop"      , "var_s_prop"    , 
+            "nheaders"      , "pis_prop"      , "vars_prop"     , 
             "seq_len"       , "seq_len_nogap" , "gap_prop"      , 
             "nogap_prop"    , "gc_mean"       , "gc_var"        ,
             "gap_mean"      , "gap_var"       , "pi_mean"       ,
@@ -938,9 +945,9 @@ class Features:
 
 # self = Features(
 #     taxonomyfile=taxonomyfile,
-#     path="/Users/ulises/Desktop/GOL/data/alldatasets/nt_aln/internally_trimmed/malns_36_mseqs_27/round2/no_lavaretus/McL", # change
-#     fasta_ext=".r2_para_no_lavaretus_TBL_tlike_aln",
-#     tree_ext=".r2_para_no_lavaretus_TBL_tlike_aln.nex.treefile",
+#     path="/Users/ulises/Desktop/GOL/software/GGpy/proofs_ggi/flatfishes/aln_trees", # change
+#     fasta_ext=".phy-out.fas",
+#     tree_ext=".tre",
 
 #     reference_tree=None,
 
@@ -952,4 +959,107 @@ class Features:
 #     # write=True
 #     )
 
-# self.write_stats()
+
+# seq_tree_files = self._readmetadata()
+
+# subset_out = [['aln_base', 
+#               'gc_std', 
+#               'gc_std_pos1', 
+#               'gc_std_pos2', 
+#               'gc_std_pos3',
+#               'vars_prop_pos1', 
+#               'vars_prop_pos2', 
+#               'vars_prop_pos3',
+#               'rcv_mod']]
+
+# for seq_tree in seq_tree_files:
+
+#     aln_file,tree_file = seq_tree
+#     # aln_file,tree_file = seq_tree_files[0]
+#     # aln_file = "/Users/ulises/Desktop/GOL/software/GGpy/demo/24_ENSG00000000460_codon_aln.fasta"
+#     aln_base = os.path.basename(aln_file)
+#     tree_base = os.path.basename(tree_file)
+
+#     sys.stdout.write("Processing stats for: %s\n" % aln_base)
+#     sys.stdout.write("Processing stats for: %s\n" % tree_base)
+#     sys.stdout.flush()
+
+#     aln  = fas_to_dic(aln_file)
+    
+#     (pis_prop     ,
+#      var_s_prop   ,
+#      gap_prop     ,
+#      nogap_prop   ,
+#      seq_len      ,
+#      nheaders     ,
+#      seq_len_nogap) = self._stat_sites_vertical(aln)
+
+#     (gc_mean   ,
+#      gc_std    ,
+#      gap_mean  , 
+#      gap_std   , 
+#      clean_rows) = self._stat_sites_horizontal(aln)
+
+#     rcv = round(self._RCV(clean_rows, seq_len), 6)    
+
+#     codon1, codon2, codon3 = self._split_aln(aln, seq_len)
+    
+#     (_,
+#      vars_prop_pos1,
+#      _,
+#      _,
+#      _,
+#      _,
+#      _) = self._stat_sites_vertical(codon1)    
+#     (gc_mean_pos1 ,
+#      gc_std_pos1  ,
+#      gap_mean_pos1, 
+#      gap_var_pos1 , 
+#      _            ) = self._stat_sites_horizontal(codon1)
+
+#     (_,
+#      vars_prop_pos2,
+#      _,
+#      _,
+#      _,
+#      _,
+#      _) = self._stat_sites_vertical(codon2)  
+#     (gc_mean_pos2 ,
+#      gc_std_pos2  ,
+#      gap_mean_pos2, 
+#      gap_var_pos2 , 
+#      _            ) = self._stat_sites_horizontal(codon2)
+
+
+#     (_,
+#      vars_prop_pos3,
+#      _,
+#      _,
+#      _,
+#      _,
+#      _) = self._stat_sites_vertical(codon3) 
+#     (gc_mean_pos3 ,
+#      gc_std_pos3  ,
+#      gap_mean_pos3, 
+#      gap_var_pos3 , 
+#      _            ) = self._stat_sites_horizontal(codon3)
+
+#     subset_out.append([
+#         aln_base,
+#         gc_std,
+#         gc_std_pos1,
+#         gc_std_pos2,
+#         gc_std_pos3,
+#         vars_prop_pos1, 
+#         vars_prop_pos2, 
+#         vars_prop_pos3,
+#         rcv
+#     ])  
+
+
+# with open( 'std_vars_and_rcv_flat.tsv' , 'w' ) as f:
+#     writer = csv.writer(f, delimiter = "\t")
+#     writer.writerows(subset_out)
+
+
+# # self.write_stats()
