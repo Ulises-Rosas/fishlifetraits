@@ -4,6 +4,7 @@ import os
 import sys
 import csv
 import glob
+import math
 import copy
 import itertools
 import collections
@@ -461,22 +462,31 @@ class Features:
 
         return codon1, codon2, codon3
 
+    def site_entropy(self, data_sum, real_seqs):    
+        out = 0
+        for v in data_sum.values():
+            prob = v/real_seqs
+            out += prob*math.log2(prob)
+            
+        return -out    
+
     def _stat_sites_vertical(self, aln):
         """
         # Stats for alignments
 
         Returning in order:
-
             * Phylogenetic informative sites
             * Variable sites
-            * Proportion of gaps
             * Proportion of non-gaps characters
             * Length of the alignment
             * Number of sequences
             * sites with no gap
-
+            * invariants
+            * singletons
+            * patterns
+            * entropy
         """
-        # file = "/Users/ulises/Desktop/GOL/software/GGpy/demo/24_ENSG00000000005_codon_aln.fasta"
+        # file = "/Users/ulises/Desktop/GOL/software/GGpy/demo/E0055.fasta"
         # aln = fas_to_dic(file)
 
         nheaders = len(aln)
@@ -485,9 +495,17 @@ class Features:
         pis_s  = 0
         n_gaps = 0
         var_s  = 0
+
+        con_s = 0 # conserved sites/invariants
+        sin_s = 0 # singletons
+        
+        patterns = [] # site patterns
+        site_entropies = [] # entropy
+
         site_w_gaps = []
 
         for pos in range(seq_len):
+            # pos = 20
             has_gaps = False
 
             column = []
@@ -506,31 +524,61 @@ class Features:
                     del data_sum[gc]
 
             site_w_gaps.append(has_gaps)
-
             uniq_char = len(data_sum)
 
             if not uniq_char:
                 continue
 
-            if uniq_char > 1:
+            patterns.append(''.join(column))
+            # number non-gap seqs/spps
+            # in the column
+            real_seqs = sum(data_sum.values())
+
+            site_entropies.append( 
+                self.site_entropy(data_sum, real_seqs) 
+            )
+
+            if uniq_char == 1:
+                # constant sites
+                # sensu Mega
+                # https://www.megasoftware.net/webhelp/glossary_rh/rh_constant_site.htm
+                if real_seqs >= 2:
+                    con_s += 1
+
+            elif uniq_char > 1:
                 var_s += 1
                 tmp_pi = [i for i in data_sum.values() if i > 1]
 
+                # singleton
+                # sensu Mega
+                # https://www.megasoftware.net/web_help_7/rh_singleton_sites.htm
+                if 0 <= len(tmp_pi) <= 1:
+                    if real_seqs >= 3:
+                        sin_s +=1
+
+                # parsimony informative
+                # sites
                 if len(tmp_pi) > 1:
                     pis_s += 1
 
         
         AlnLen_nogaps = seq_len - sum(site_w_gaps) 
         AREA = nheaders * seq_len
-        gap_prop = round(n_gaps/AREA, 6)
+        # theoretically the same as 
+        # gap mean!!
+        gap_prop = round(n_gaps/AREA, 6) 
 
-        return ( round( pis_s/seq_len, 6),
-                 round( var_s/seq_len, 6),
-                 gap_prop, 
+        return ( pis_s,
+                 var_s, 
                  1 - gap_prop, 
                  seq_len, 
                  nheaders, 
-                 AlnLen_nogaps)
+                 AlnLen_nogaps,
+                 con_s,
+                 sin_s,
+                 len(set(patterns)),
+                 round(stats.mean(site_entropies), 6)
+                )
 
     def _DVMC(self, tree):
         """
@@ -776,13 +824,17 @@ class Features:
 
         aln  = fas_to_dic(aln_file)
         
-        (pis_prop     ,
-         var_s_prop   ,
-         gap_prop     ,
+        (pis     ,
+         var_s   ,
          nogap_prop   ,
          seq_len      ,
          nheaders     ,
-         seq_len_nogap) = self._stat_sites_vertical(aln)
+         seq_len_nogap,
+         invariants,
+         singletons,
+         patterns,
+         entropy
+         ) = self._stat_sites_vertical(aln)
 
         (gc_mean   ,
          gc_var    ,
@@ -818,17 +870,23 @@ class Features:
 
         stdout = [ 
             aln_base      , 
-            nheaders      , pis_prop      , var_s_prop    ,
-            seq_len       , seq_len_nogap , gap_prop      , 
+            nheaders      , pis           , var_s    ,
+            seq_len       , seq_len_nogap , 
             nogap_prop    , gc_mean       , gc_var        ,
             gap_mean      , gap_var       , pi_mean       ,
             pi_std        , total_tree_len, treeness      ,
             inter_len_mean, inter_len_var , ter_len_mean  ,
             ter_len_var   , avg_node      , coeffVar_len  ,
             rcv           , treeness_o_rcv, saturation    , 
-            SymPval       , MarPval       , IntPval       , 
-            LB_std
+            LB_std, 
+            invariants,
+            singletons,
+            patterns,
+            entropy
         ]
+
+        if self.sym_tests:
+            stdout.extend([ SymPval, MarPval , IntPval ])
 
         if self._taxa:
             stdout.append( self._taxonomy_sampling(aln) )
@@ -867,17 +925,24 @@ class Features:
 
         colnames = [
             "aln_base"      ,
-            "nheaders"      , "pis_prop"      , "vars_prop"     , 
-            "seq_len"       , "seq_len_nogap" , "gap_prop"      , 
+            "nheaders"      , "pis"           , "vars"     ,             
+            # "nheaders"      , "pis_prop"      , "vars_prop"     , 
+            "seq_len"       , "seq_len_nogap" , 
             "nogap_prop"    , "gc_mean"       , "gc_var"        ,
             "gap_mean"      , "gap_var"       , "pi_mean"       ,
             "pi_std"        , "total_tree_len", "treeness"      ,
             "inter_len_mean", "inter_len_var" , "ter_len_mean"  ,
             "ter_len_var"   , "supp_mean"     , "coeffVar_len"  ,
             "rcv"           , "treeness_o_rcv", "saturation"    , 
-            "SymPval"       , "MarPval"       , "IntPval"       ,
-            "LB_std"
+            "LB_std",
+            "invariants",
+            "singletons",
+            "patterns",
+            "entropy"
         ]
+        
+        if self.sym_tests:
+            colnames.extend([ "SymPval", "MarPval", "IntPval" ])
 
         if self._taxa:
             colnames.append("tax_prop")
