@@ -13,8 +13,8 @@ from multiprocessing import Pool
 
 
 import dendropy
-import numpy as np
-from scipy.stats import chi2
+# import numpy as np
+# from scipy.stats import chi2
 
 
 from fishlifetraits.utils import fas_to_dic
@@ -163,18 +163,32 @@ class Features:
 
         return out*100/seq_len
 
-    def _PI_perc(self, aln, seq_len):
+    def _PI_perc(self, aln, seq_len, tax_max = 100, pick = 5000, seed = 12038):
         """
         # Pairwise Identity percentage
 
         * returns mean and standar deviation, whole table
         * it doesn't consider gap character
         * it considers N character
+
+        * tax_max: maximum number of taxa to consider
+        * pick: number of random pairs to consider if tax_max is exceeded
+        * seed: random seed for pick
         """
+        # aln = range(300)
+        import random
+        random.seed(seed)
+
         pi_list = []
         headers_list = []
+        n = len(aln)
 
-        for h1,h2 in itertools.combinations(aln, 2):
+        all_combs = list(itertools.combinations(aln, 2))
+        
+        if n > tax_max:
+            all_combs = random.choices(all_combs, k = pick)
+
+        for h1,h2 in all_combs:
             pi_list.append(
                 self._identity_perc( aln[h1], aln[h2], seq_len)
             )
@@ -195,6 +209,10 @@ class Features:
         Stuart (1955)
         for marginal symmetry
         """
+
+        import numpy as np
+        from scipy.stats import chi2
+
         # dissM = np.array([[1,0,0,0],
         #                   [0,2,0,0],
         #                   [0,0,3,0],
@@ -229,6 +247,7 @@ class Features:
             return None
 
     def _Internal_symmetry(self, Sb, Ss, Dfb):
+        from scipy.stats import chi2
 
         if Sb and Ss and Dfb > 3:
             Si =  Sb - Ss
@@ -242,6 +261,9 @@ class Features:
         """
         {A, T, C, G} dissimilarity matrix
         """
+        import numpy as np
+        # from scipy.stats import chi2
+
         if aa:
             bases = np.array(self.aa_bases).reshape((1, -1))
             
@@ -260,6 +282,8 @@ class Features:
         """
         * Bowker (1948) 
         """
+        import numpy as np
+
         # max divergence pair
         all_diss = []
 
@@ -312,6 +336,8 @@ class Features:
         * Naser-Khdour et al. (2019)
         @ https://doi.org/10.1093/gbe/evz193
         """
+        # import numpy as np        
+        from scipy.stats import chi2
         # aa = True
         # all_pairs = [i[0] for i in pi_table]
 
